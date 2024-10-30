@@ -92,7 +92,7 @@ const Page = () => {
             </button>
           )}
           <select
-            className="select select-info w-full select-sm max-w-xs "
+            className="select select-info w-full select-sm max-w-sm "
             value={selectedCountries.includes("") ? "" : selectedIndicator}
             disabled={selectedCountries.includes("")}
             onChange={(event) => setSelectedIndicator(event.target.value)}
