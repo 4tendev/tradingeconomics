@@ -10,8 +10,6 @@ export async function POST(request: Request) {
 
   for (let index = 0; index < contories.length; index++) {
     const country = contories[index];
-    console.log(country)
-    console.log(indicator)
     const res = await fetch(
       `https://api.tradingeconomics.com/historical/country/${country}/indicator/${indicator}?c=e0721bcb6806404:z9606uviey8lwwm&f=json`,
       {
