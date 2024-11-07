@@ -1,37 +1,106 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { LineChart, Line, XAxis, YAxis, Tooltip, Legend } from "recharts";
 
 const Page = () => {
+  const [elementWidth, setElementWidth] = useState<number>(300);
   const [selectedCountries, setSelectedCountries] = useState(["", ""]);
-  const [selectedIndicator, setSelectedIndicator] = useState("");
+  const [selectedIndicator, setSelectedIndicator] = useState({
+    name: "",
+    x: "",
+    y: "",
+  });
 
-  const freeCountries = ["Sweden", "Mexico", "New Zealand", "Thailand"];
+  const [fetching, setFetching] = useState(false)
 
-  const indicators = [
-    "gdp",
-    "Unemployment Rate",
-    "Harmonised Inflation Rate YoY",
+  const [data, setData] = useState<any[]>([]);
+  type FreeCountry = ["Sweden", "Mexico", "New Zealand", "Thailand"];
+  const freeCountries: FreeCountry = [
+    "Sweden",
+    "Mexico",
+    "New Zealand",
+    "Thailand",
   ];
 
-  function getData() {
-    fetch("/compare/api", {
+  const indicators = [
+    { name: "gdp", x: "DateTime", y: "Value" },
+    { name: "Inflation Rate", x: "DateTime", y: "Value" },
+  ];
+
+  const colors = ["orange", "red", "blue", "black"];
+
+  async function getData() {
+    setFetching(true)
+    setData([]);
+    const response = await fetch("/compare/api", {
       method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify({
         countries: selectedCountries,
-        indicator: selectedIndicator,
+        indicator: selectedIndicator.name,
       }),
     });
+
+    const responseData = await response.json();
+    const normalizedData: any = {};
+    responseData.map((countrydata: any, index: number) => {
+      const country = countrydata.Country;
+      if (index + 1 != responseData.length) {
+        if (!normalizedData[countrydata[selectedIndicator["x"]]]) {
+          normalizedData[countrydata[selectedIndicator["x"]]] = {};
+          normalizedData[countrydata[selectedIndicator["x"]]][
+            selectedIndicator["x"]
+          ] = countrydata[selectedIndicator["x"]].substring(0, 10);
+        }
+        normalizedData[countrydata[selectedIndicator["x"]]] = {
+          ...normalizedData[countrydata[selectedIndicator["x"]]],
+          [country]: countrydata[selectedIndicator["y"]] || 1,
+        };
+      }
+      return countrydata;
+    });
+
+    setData(
+      Object.values(normalizedData).filter((data: any) => {
+        return selectedCountries.every((country) => data[country]);
+      })
+    );
+    setFetching(false)
   }
 
   useEffect(() => {
-    selectedIndicator !== "" && getData();
+    selectedIndicator.name !== "" &&
+      !selectedCountries.includes("") &&
+      getData();
     return () => {};
-  }, [selectedIndicator]);
+  }, [selectedIndicator, selectedCountries]);
   useMemo(
-    () => selectedCountries.includes("") && setSelectedIndicator(""),
+    () =>
+      selectedCountries.includes("") &&
+      setSelectedIndicator({
+        name: "",
+        x: "",
+        y: "",
+      }),
     [selectedCountries]
   );
+  useEffect(() => {
+    const updateElementWidth = () => {
+      const element = document.getElementById("chart");
+      if (element) {
+        const width = element.offsetWidth;
+        setElementWidth(width);
+      }
+    };
+    updateElementWidth();
+    window.addEventListener("resize", updateElementWidth);
+    return () => {
+      window.removeEventListener("resize", updateElementWidth);
+    };
+  }, [data]);
 
   return (
     <>
@@ -93,16 +162,64 @@ const Page = () => {
           )}
           <select
             className="select select-info w-full select-sm max-w-sm "
-            value={selectedCountries.includes("") ? "" : selectedIndicator}
+            value={
+              selectedCountries.includes("") ? "" : selectedIndicator["name"]
+            }
             disabled={selectedCountries.includes("")}
-            onChange={(event) => setSelectedIndicator(event.target.value)}
+            onChange={(event) =>
+              setSelectedIndicator(
+                indicators.filter(
+                  (indicator) => indicator["name"] == event.target.value
+                )[0]
+              )
+            }
           >
             <option value={""}>{"Please select a indicator"}</option>
             {indicators.map((indicator) => (
-              <option key={indicator}>{indicator}</option>
+              <option key={indicator["name"]}>{indicator["name"]}</option>
             ))}
           </select>
         </div>
+        {
+          fetching && <span className="loading loading-infinity loading-lg"></span>
+        }
+        {selectedIndicator.name != "" && data.length > 0 && (
+          <div id="chart" className="w-full max-w-5xl mx-auto min-w-xl pt-3">
+     
+            <LineChart
+              width={elementWidth}
+              height={400}
+              data={data}
+              margin={{
+                top: 3,
+                right: 15,
+                left: 0,
+                bottom: 0,
+              }}
+            >
+              <XAxis dataKey={selectedIndicator.x} tickMargin={3} />
+
+              <Tooltip
+                animationDuration={500}
+                allowEscapeViewBox={{ x: false }}
+              />
+              {selectedCountries.map((country, index) => (
+                <Line
+                  key={country}
+                  yAxisId="date"
+                  type="monotone"
+                  dataKey={country}
+                  attributeName="ss"
+                  stroke={colors[index]}
+                  dot={false}
+                  strokeWidth={2}
+                />
+              ))}
+
+              <Legend />
+            </LineChart>
+          </div>
+        )}
       </div>
     </>
   );
